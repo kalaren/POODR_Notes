@@ -1,4 +1,3 @@
-notes
 
 attr_reader :variable
 use @variable = data in initialize method
