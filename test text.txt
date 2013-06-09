@@ -1,1 +1,393 @@
-test text
+notes
+
+attr_reader :variable
+use @variable = data in initialize method
+can reference with just variable
+
+use struct.new(a,b,c) for temporary arrays to collect data so other methods do not directly reference input data
+
+
+unordered variables in creation of new object 
+def initialize(args)
+    @chainring = args[:chainring] || default here @chainring returns true
+    @cog       = args.fetch[:cog, default] @chainring returns false or nil
+    @wheel     = args[:wheel]
+end
+
+separate default method
+   def defaults
+     {:chainring => 40, :cog => 18}
+   end
+
+homenotes uses Variable.new(params(:variable))
+
+
+transform unaccessable fixed order gear into args
+1 # When Gear is part of an external interface
+ 2 module SomeFramework
+ 3   class Gear
+ 4     attr_reader :chainring, :cog, :wheel
+ 5     def initialize(chainring, cog, wheel)
+ 6       @chainring = chainring
+ 7       @cog       = cog
+ 8       @wheel     = wheel
+ 9     end
+10   # ...
+11   end
+12 end
+13
+14 # wrap the interface to protect yourself from changes
+15 module GearWrapper
+16   def self.gear(args)
+17     SomeFramework::Gear.new(args[:chainring],
+18                             args[:cog],
+19                             args[:wheel])
+20   end
+21 end
+22
+23 # Now you can create a new Gear using an arguments hash.
+24 GearWrapper.gear(
+25   :chainring => 52,
+26   :cog       => 11,
+27   :wheel     => Wheel.new(26, 1.5)).gear_inches
+
+
+
+duck typing reference the same method name in multiple classes when they are required to complete the same activity
+1 # Trip preparation becomes easier
+ 2 class Trip
+ 3   attr_reader :bicycles, :customers, :vehicle
+ 4
+ 5   def prepare(preparers)
+ 6     preparers.each {|preparer|
+ 7       preparer.prepare_trip(self)}
+ 8   end
+ 9 end
+10
+11 # when every preparer is a Duck
+12 # that responds to 'prepare_trip'
+13 class Mechanic
+14   def prepare_trip(trip)
+15     trip.bicycles.each {|bicycle|
+16       prepare_bicycle(bicycle)}
+17   end
+18
+19   # ...
+20 end
+21
+22 class TripCoordinator
+23   def prepare_trip(trip)
+24     buy_food(trip.customers)
+25   end
+26
+27   # ...
+28 end
+29
+30 class Driver
+31   def prepare_trip(trip)
+32     vehicle = trip.vehicle
+33     gas_up(vehicle)
+34     fill_water_tank(vehicle)
+35   end
+36   # ...
+37 end
+
+
+
+
+set up class for initializing subclasses
+1 class Bicycle
+ 2   attr_reader :size     # <- promoted from RoadBike
+ 3
+ 4   def initialize(args={})
+ 5     @size = args[:size] # <- promoted from RoadBike
+ 6   end
+ 7 end
+ 8
+ 9 class RoadBike < Bicycle
+10   attr_reader :tape_color
+11
+12   def initialize(args)
+13     @tape_color = args[:tape_color]
+14     super(args)  # <- RoadBike now MUST send 'super'
+15   end
+16   # ...
+17 end
+
+
+
+set up default in superclass while declaring value in subclass
+class Bicycle
+ 2   attr_reader :size, :chain, :tire_size
+ 3
+ 4   def initialize(args={})
+ 5     @size       = args[:size]
+ 6     @chain      = args[:chain]     || default_chain
+ 7     @tire_size  = args[:tire_size] || default_tire_size
+ 8   end
+ 9
+10   def default_chain       # <- common default
+11     '10-speed'
+12   end
+13 end
+14
+15 class RoadBike < Bicycle
+16   # ...
+17   def default_tire_size   # <- subclass default
+18     '23'
+19   end
+20 end
+21
+22 class MountainBike < Bicycle
+23   # ...
+24   def default_tire_size   # <- subclass default
+25     '2.1'
+26   end
+27 end
+
+creating a new subclass without default_chian defined 
+# NameError: undefined local variable or method
+ 9 #   'default_tire_size'
+
+create a method that will raise an error in bicycle to explain the issue
+class Bicycle
+ 2   #...
+ 3   def default_tire_size
+ 4     raise NotImplementedError,
+ 5           "This #{self.class} cannot respond to:"
+ 6   end
+ 7 end
+
+
+decoupling class initialization use methods instead of super
+ 1 class Bicycle
+ 2
+ 3   def initialize(args={})
+ 4     @size       = args[:size]
+ 5     @chain      = args[:chain]     || default_chain
+ 6     @tire_size  = args[:tire_size] || default_tire_size
+ 7
+ 8     post_initialize(args)   # Bicycle both sends
+ 9   end
+10
+11   def post_initialize(args) # and implements this
+12     nil
+13   end
+14   # ...
+15 end
+16
+17 class RoadBike < Bicycle
+18
+19   def post_initialize(args)         # RoadBike can
+20     @tape_color = args[:tape_color] # optionally
+21   end                               # override it
+22   # ...
+23 end
+
+decouple methods with merge(submethod) submethod initialized in super and defined in sub 
+1 class Bicycle
+ 2   # ...
+ 3   def spares
+ 4     { tire_size: tire_size,
+ 5       chain:     chain}.merge(local_spares)
+ 6   end
+ 7
+ 8   # hook for subclasses to override
+ 9   def local_spares
+10     {}
+11   end
+12
+13 end
+14
+15 class RoadBike < Bicycle
+16   # ...
+17   def local_spares
+18     {tape_color: tape_color}
+19   end
+20
+21 end
+
+
+Complete Bicycle
+1 class Bicycle
+ 2   attr_reader :size, :chain, :tire_size
+ 3
+ 4   def initialize(args={})
+ 5     @size       = args[:size]
+ 6     @chain      = args[:chain]     || default_chain
+ 7     @tire_size  = args[:tire_size] || default_tire_size
+ 8     post_initialize(args)
+ 9   end
+10
+11   def spares
+12     { tire_size: tire_size,
+13       chain:     chain}.merge(local_spares)
+14   end
+15
+16   def default_tire_size
+17     raise NotImplementedError
+18   end
+19
+20   # subclasses may override
+21   def post_initialize(args)
+22     nil
+23   end
+24
+25   def local_spares
+26     {}
+27   end
+28
+29   def default_chain
+30     '10-speed'
+31   end
+32
+33 end
+34
+35 class RoadBike < Bicycle
+36   attr_reader :tape_color
+37
+38   def post_initialize(args)
+39     @tape_color = args[:tape_color]
+40   end
+41
+42   def local_spares
+43     {tape_color: tape_color}
+44   end
+45
+46   def default_tire_size
+47     '23'
+48   end
+49 end
+50
+51 class MountainBike < Bicycle
+52   attr_reader :front_shock, :rear_shock
+53
+54   def post_initialize(args)
+55     @front_shock = args[:front_shock]
+56     @rear_shock =  args[:rear_shock]
+57   end
+58
+59   def local_spares
+60     {rear_shock:  rear_shock}
+61   end
+62
+63   def default_tire_size
+64     '2.1'
+65   end
+66 end
+
+example of new method for bicycle
+ 1 class RecumbentBike < Bicycle
+ 2   attr_reader :flag
+ 3
+ 4   def post_initialize(args)
+ 5     @flag = args[:flag]
+ 6   end
+ 7
+ 8   def local_spares
+ 9     {flag: flag}
+10   end
+11
+12   def default_chain
+13     "9-speed"
+14   end
+15
+16   def default_tire_size
+17     '28'
+18   end
+19 end
+
+
+
+implementation of schedule
+1 class Schedule
+ 2   def scheduled?(schedulable, start_date, end_date)
+ 3     puts "This #{schedulable.class} " +
+ 4          "is not scheduled\n" +
+ 5          "  between #{start_date} and #{end_date}"
+ 6     false
+ 7   end
+ 8 end
+
+1 class Bicycle
+ 2   attr_reader :schedule, :size, :chain, :tire_size
+ 3
+ 4   # Inject the Schedule and provide a default
+ 5   def initialize(args={})
+ 6     @schedule = args[:schedule] || Schedule.new
+ 7     # ...
+ 8   end
+ 9
+10   # Return true if this bicycle is available
+11   # during this (now Bicycle specific) interval.
+12   def schedulable?(start_date, end_date)
+13     !scheduled?(start_date - lead_days, end_date)
+14   end
+15
+16   # Return the schedule's answer
+17   def scheduled?(start_date, end_date)
+18     schedule.scheduled?(self, start_date, end_date)
+19   end
+20
+21   # Return the number of lead_days before a bicycle
+22   # can be scheduled.
+23   def lead_days
+24     1
+25   end
+26
+27   # ...
+28 end
+29
+30 require 'date'
+31 starting = Date.parse("2015/09/04")
+32 ending   = Date.parse("2015/09/10")
+33
+34 b = Bicycle.new
+35 b.schedulable?(starting, ending)
+36 # This Bicycle is not scheduled
+37 #   between 2015-09-03 and 2015-09-10
+38 #  => true
+
+module version
+1 module Schedulable
+ 2   attr_writer :schedule
+ 3
+ 4   def schedule
+ 5     @schedule ||= ::Schedule.new
+ 6   end
+ 7
+ 8   def schedulable?(start_date, end_date)
+ 9     !scheduled?(start_date - lead_days, end_date)
+10   end
+11
+12   def scheduled?(start_date, end_date)
+13     schedule.scheduled?(self, start_date, end_date)
+14   end
+15
+16   # includers may override
+17   def lead_days
+18     0
+19   end
+20
+21 end
+
+ 1 class Bicycle
+ 2   include Schedulable
+ 3
+ 4   def lead_days
+ 5     1
+ 6   end
+ 7
+ 8   # ...
+ 9 end
+10
+11 require 'date'
+12 starting = Date.parse("2015/09/04")
+13 ending   = Date.parse("2015/09/10")
+14
+15 b = Bicycle.new
+16 b.schedulable?(starting, ending)
+17 # This Bicycle is not scheduled
+18 #    between 2015-09-03 and 2015-09-10
+19 #  => true
+20
